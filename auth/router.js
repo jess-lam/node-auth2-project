@@ -6,7 +6,10 @@ const Users = require("../users/users-model");
 const { jwtSecret } = require('../config/secrets');
 
 router.post("/register", (req, res) => {
-    const userInfo = req.body
+    let userInfo = req.body
+    if(!userInfo.department) { //checks if the department is missing, then throw an error
+        res.status(418).json({message: 'Please add a department.'}) //if statement has to be outside the add function b/c department is NOT NULLABLE and if its inside the add function, it will just hang
+    }
 
     const ROUNDS = process.env.HASHING_ROUNDS || 8;
     const hash = bcrypt.hashSync(userInfo.password, ROUNDS)
@@ -14,9 +17,12 @@ router.post("/register", (req, res) => {
     userInfo.password = hash;
     Users.add(userInfo)
     .then(user => {
-        res.json(user);
+        const token = generateToken(user);
+    res.status(201).json(user, token);
     })
-    .catch(err => console.log(err));
+    .catch((error) => {
+        res.status(500).json({message: 'Cannot register user.', error})
+    });
 })
 
 router.post("/login", (req, res) => {
@@ -43,7 +49,7 @@ router.post("/login", (req, res) => {
 function generateToken(user) {
     const payload = {
         username: user.username,
-        role: user.role || "user"
+        role: user.department || "user"
     };
 
     const options = {
